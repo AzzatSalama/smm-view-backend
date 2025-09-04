@@ -12,8 +12,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('streamer_id')->constrained('streamers')->onDelete('cascade');
             $table->foreignId('subscription_plan_id')->constrained();
-            $table->timestamp('start_date');
-            $table->timestamp('end_date');
+            $table->timestamp('start_date')->nullable();
+            $table->timestamp('end_date')->nullable();
             $table->enum('status', ['pending','active', 'canceled', 'expired'])->default('pending');
             $table->timestamps();
 
