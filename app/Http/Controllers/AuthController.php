@@ -3,19 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Mail\SetupPasswordMail;
+use App\Mail\ResetPasswordMail;
 use App\Models\Streamer;
 use App\Models\User;
 use App\Models\SubscriptionPlan;
 use App\Models\StreamerSubscription;
+use App\Traits\ManagesSixDigitTokens;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
+    use ManagesSixDigitTokens;
+
     /**
      * Universal login for all user types (streamers, admins, moderators)
      */
@@ -134,17 +139,14 @@ class AuthController extends Controller
         // Check if user exists
         $user = User::where('email', $data['email'])->first();
         if (!$user) {
-            return response()->json(['message' => 'If an account with that email exists, a reset link has been sent.']);
+            return response()->json(['message' => 'If an account with that email exists, a reset code has been sent.']);
         }
 
-        // Send password reset link
-        $status = Password::sendResetLink(['email' => $data['email']]);
+        // Generate 6-digit token and send email
+        $token = $this->createSixDigitToken($user);
+        Mail::to($user->email)->send(new ResetPasswordMail($token));
 
-        if ($status === Password::RESET_LINK_SENT) {
-            return response()->json(['message' => 'Password reset link sent to your email.']);
-        }
-
-        return response()->json(['message' => 'Unable to send reset link. Please try again.'], 422);
+        return response()->json(['message' => 'Password reset code sent to your email.']);
     }
 
     /**
@@ -182,29 +184,30 @@ class AuthController extends Controller
             'password' => ['required', 'confirmed', PasswordRule::defaults()],
         ]);
 
-        $status = Password::reset(
-            [
-                'email' => $data['email'],
-                'token' => $data['token'],
-                'password' => $data['password'],
-                'password_confirmation' => $request->input('password_confirmation'),
-            ],
-            function (User $user, string $password) {
-                $user->forceFill([
-                    'password' => Hash::make($password),
-                    'email_verified_at' => $user->email_verified_at ?? now(), // Verify email if not already verified
-                ])->save();
-
-                // Invalidate all existing tokens for security
-                $user->tokens()->delete();
-            }
-        );
-
-        if ($status === Password::PASSWORD_RESET) {
-            return response()->json(['message' => 'Password reset successfully.']);
+        $user = User::where('email', $data['email'])->first();
+        
+        if (!$user) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+        
+        // Verify the 6-digit token
+        if (!$this->verifySixDigitToken($user, $data['token'])) {
+            return response()->json(['message' => 'Invalid or expired reset code.'], 422);
         }
 
-        return response()->json(['message' => __($status)], 422);
+        // Update user password
+        $user->forceFill([
+            'password' => Hash::make($data['password']),
+            'email_verified_at' => $user->email_verified_at ?? now(), // Verify email if not already verified
+        ])->save();
+
+        // Invalidate all existing tokens for security
+        $user->tokens()->delete();
+        
+        // Delete the used token
+        DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+
+        return response()->json(['message' => 'Password reset successfully.']);
     }
 
     /**
@@ -277,7 +280,7 @@ class AuthController extends Controller
                 'views_delivered' => $data['custom_plan']['views_delivered'],
                 'chat_messages_delivered' => $data['custom_plan']['chat_messages_delivered'],
                 'features' => [],
-                'is_active' => true,
+                'is_active' => false,
                 'is_most_popular' => false,
             ]);
             $planId = $customPlan->id;
@@ -287,17 +290,30 @@ class AuthController extends Controller
 
         // Create subscription if plan is selected
         if ($planId) {
+            // Get the plan duration
+            $durationDays = 30; // Default duration
+            
+            if (isset($data['custom_plan'])) {
+                $durationDays = $data['custom_plan']['duration_days'];
+            } else {
+                // For regular plans, get duration from the subscription plan
+                $plan = SubscriptionPlan::find($planId);
+                if ($plan) {
+                    $durationDays = $plan->duration_days;
+                }
+            }
+            
             StreamerSubscription::create([
                 'streamer_id' => $streamer->id,
                 'subscription_plan_id' => $planId,
                 'status' => 'pending', // Will be activated after payment
                 'start_date' => now()->addDay(),
-                'end_date' => now()->addDay()->addDays($data['custom_plan']['duration_days']),
+                'end_date' => now()->addDay()->addDays($durationDays),
             ]);
         }
 
         // Create setup token and send email
-        $token = Password::getRepository()->create($user);
+        $token = $this->createSixDigitToken($user);
         Mail::to($user->email)->send(new SetupPasswordMail($token));
 
         return response()->json([
@@ -318,29 +334,26 @@ class AuthController extends Controller
             'password' => ['required', 'confirmed', PasswordRule::defaults()],
         ]);
 
-        $status = Password::reset(
-            [
-                'email' => $data['email'],
-                'token' => $data['token'],
-                'password' => $data['password'],
-                'password_confirmation' => $request->input('password_confirmation'),
-            ],
-            function (User $user, string $password) {
-                $user->forceFill([
-                    'password' => Hash::make($password),
-                    'email_verified_at' => now(), // Activate account
-                ])->save();
-
-                // Clear any existing tokens
-                $user->tokens()->delete();
-            }
-        );
-
-        if ($status === Password::PASSWORD_RESET) {
-            return response()->json(['message' => 'Password set successfully. You can now login.']);
+        $user = User::where('email', $data['email'])->first();
+        
+        // Verify the 6-digit token
+        if (!$this->verifySixDigitToken($user, $data['token'])) {
+            return response()->json(['message' => 'Invalid or expired token.'], 422);
         }
 
-        return response()->json(['message' => __($status)], 422);
+        // Update user password and activate account
+        $user->forceFill([
+            'password' => Hash::make($data['password']),
+            'email_verified_at' => now(), // Activate account
+        ])->save();
+
+        // Clear any existing tokens
+        $user->tokens()->delete();
+        
+        // Delete the used token
+        DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+
+        return response()->json(['message' => 'Password set successfully. You can now login.']);
     }
 
     /**
@@ -360,7 +373,7 @@ class AuthController extends Controller
         }
 
         // Create new setup token and send email
-        $token = Password::getRepository()->create($user);
+        $token = $this->createSixDigitToken($user);
         Mail::to($user->email)->send(new SetupPasswordMail($token));
 
         return response()->json(['message' => 'Setup instructions sent to your email.']);
@@ -377,8 +390,7 @@ class AuthController extends Controller
         ]);
 
         $user = User::where('email', $data['email'])->first();
-        $repo = Password::getRepository();
-        $valid = $repo->exists($user, $data['token']);
+        $valid = $this->verifySixDigitToken($user, $data['token']);
 
         return response()->json([
             'valid' => (bool) $valid,

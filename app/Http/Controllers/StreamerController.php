@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\PlannedStream;
 use App\Models\StreamerWordsLists;
 use App\Services\DiscordService;
+use App\Traits\ManagesSixDigitTokens;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -18,6 +19,8 @@ use Carbon\Carbon;
 
 class StreamerController extends Controller
 {
+    use ManagesSixDigitTokens;
+
     // Register streamer (no password). Sends setup token email.
     public function register(Request $request)
     {
@@ -41,7 +44,7 @@ class StreamerController extends Controller
         ]);
 
         // Create or update a setup token using password broker table
-        $token = Password::getRepository()->create($user);
+        $token = $this->createSixDigitToken($user);
         Mail::to($user->email)->send(new SetupPasswordMail($token));
 
         return response()->json(['message' => 'Registration successful. Setup token sent to email.']);
