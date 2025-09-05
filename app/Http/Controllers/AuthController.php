@@ -390,6 +390,15 @@ class AuthController extends Controller
         ]);
 
         $user = User::where('email', $data['email'])->first();
+        
+        // Debug the incoming token
+        \Log::info("Validating setup token:", [
+            'email' => $data['email'],
+            'received_token' => $data['token'],
+            'token_length' => strlen($data['token']),
+            'token_type' => gettype($data['token']),
+        ]);
+        
         $valid = $this->verifySixDigitToken($user, $data['token']);
 
         return response()->json([
