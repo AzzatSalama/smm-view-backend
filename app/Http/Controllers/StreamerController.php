@@ -377,7 +377,7 @@ class StreamerController extends Controller
 
         // If updating duration or scheduled_start, check daily limits
         if (isset($data['estimated_duration']) || isset($data['scheduled_start'])) {
-            $newDuration = $data['estimated_duration'] ?? $stream->estimated_duration;
+            $newDuration = (int) ($data['estimated_duration'] ?? $stream->estimated_duration);
             $newScheduledStart = isset($data['scheduled_start'])
                 ? Carbon::parse($data['scheduled_start'])
                 : $stream->scheduled_start;
@@ -412,7 +412,7 @@ class StreamerController extends Controller
             $newScheduledStart = isset($data['scheduled_start'])
                 ? Carbon::parse($data['scheduled_start'])
                 : $stream->scheduled_start;
-            $newDuration = $data['estimated_duration'] ?? $stream->estimated_duration;
+            $newDuration = (int) ($data['estimated_duration'] ?? $stream->estimated_duration);
 
             $conflictingStream = $streamer->plannedStreams()
                 ->where('id', '!=', $stream->id)

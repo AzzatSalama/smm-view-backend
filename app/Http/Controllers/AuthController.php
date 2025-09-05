@@ -294,12 +294,12 @@ class AuthController extends Controller
             $durationDays = 30; // Default duration
             
             if (isset($data['custom_plan'])) {
-                $durationDays = $data['custom_plan']['duration_days'];
+                $durationDays = (int) $data['custom_plan']['duration_days'];
             } else {
                 // For regular plans, get duration from the subscription plan
                 $plan = SubscriptionPlan::find($planId);
                 if ($plan) {
-                    $durationDays = $plan->duration_days;
+                    $durationDays = (int) $plan->duration_days;
                 }
             }
             

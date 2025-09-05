@@ -276,7 +276,7 @@ class PaymentController extends Controller
             $subscription->update([
                 'status' => 'active',
                 'start_date' => now(),
-                'end_date' => now()->addDays($subscriptionPlan->duration_days),
+                'end_date' => now()->addDays((int) $subscriptionPlan->duration_days),
             ]);
 
             // Log the activation
