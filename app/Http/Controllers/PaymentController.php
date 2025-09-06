@@ -15,7 +15,7 @@ class PaymentController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Payment::with(['streamer.user', 'subscription.subscription_plan'])
+        $query = Payment::with(['streamer.user', 'subscription.subscriptionPlan'])
                         ->orderBy('created_at', 'desc');
 
         // Apply filters
@@ -82,7 +82,7 @@ class PaymentController extends Controller
             'description' => $request->description
         ]);
 
-        $payment->load(['streamer.user', 'subscription.subscription_plan']);
+        $payment->load(['streamer.user', 'subscription.subscriptionPlan']);
 
         // Check if payment should activate subscription
         if ($payment->status === Payment::STATUS_COMPLETED && $payment->subscription) {
@@ -100,7 +100,7 @@ class PaymentController extends Controller
      */
     public function show(Payment $payment)
     {
-        $payment->load(['streamer.user', 'subscription.subscription_plan']);
+        $payment->load(['streamer.user', 'subscription.subscriptionPlan']);
 
         return response()->json([
             'payment' => $payment,
@@ -132,7 +132,7 @@ class PaymentController extends Controller
             'amount', 'payment_method', 'status', 'transaction_id', 'description'
         ]));
 
-        $payment->load(['streamer.user', 'subscription.subscription_plan']);
+        $payment->load(['streamer.user', 'subscription.subscriptionPlan']);
 
         // Check if payment status changed to completed and should activate subscription
         if ($payment->status === Payment::STATUS_COMPLETED && $payment->subscription) {
@@ -169,7 +169,7 @@ class PaymentController extends Controller
         }
 
         $payment->update(['status' => 'refunded']);
-        $payment->load(['streamer.user', 'subscription.subscription_plan']);
+        $payment->load(['streamer.user', 'subscription.subscriptionPlan']);
 
         return response()->json([
             'payment' => $payment,
@@ -189,7 +189,7 @@ class PaymentController extends Controller
         }
 
         $payment->update(['status' => 'pending']);
-        $payment->load(['streamer.user', 'subscription.subscription_plan']);
+        $payment->load(['streamer.user', 'subscription.subscriptionPlan']);
 
         return response()->json([
             'payment' => $payment,
@@ -205,7 +205,7 @@ class PaymentController extends Controller
         $streamer = Streamer::findOrFail($streamerId);
         
         $payments = Payment::where('payee_id', $streamerId)
-                          ->with(['subscription.subscription_plan'])
+                          ->with(['subscription.subscriptionPlan'])
                           ->orderBy('created_at', 'desc')
                           ->get();
 

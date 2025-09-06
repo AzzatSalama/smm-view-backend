@@ -165,11 +165,11 @@
                     Use this token to complete your account setup and create your secure password. This token will expire in <span class="accent-text">24 hours</span> for your security.
                 </p>
                 
-                <div style="text-align: center; margin: 32px 0;">
+                <!-- <div style="text-align: center; margin: 32px 0;">
                     <a href="{{ config('app.frontend_url') }}/setup-password?token={{ $token }}" class="cta-button">
                         Complete Setup
                     </a>
-                </div>
+                </div> -->
             </div>
             
             <div class="footer">
