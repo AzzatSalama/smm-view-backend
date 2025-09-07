@@ -124,8 +124,11 @@ class Streamer extends Model
         // Use the subscription plan's duration_days and duration_hours directly
         $totalDays = $activeSubscription->subscriptionPlan->duration_days;
         $dailyHours = $activeSubscription->subscriptionPlan->duration_hours;
+        $totalAvailable = $totalDays * $dailyHours;
 
-        return $totalDays * $dailyHours;
+        \Log::info("Streamer {$this->id} - Available Hours: {$totalDays} days × {$dailyHours} hours = {$totalAvailable} hours");
+
+        return $totalAvailable;
     }
 
     /**
@@ -145,7 +148,6 @@ class Streamer extends Model
         $streams = $this->plannedStreams()
             ->where('scheduled_start', '>=', $startDate)
             ->where('scheduled_start', '<=', $endDate)
-            ->whereIn('status', [PlannedStream::STATUS_SCHEDULED, PlannedStream::STATUS_LIVE, PlannedStream::STATUS_COMPLETED])
             ->get();
 
         $totalHours = $streams->sum(function ($stream) {
@@ -178,6 +180,10 @@ class Streamer extends Model
     {
         $remainingHours = $this->getRemainingTotalHours();
         $requestedHours = $durationMinutes / 60;
+        $totalAvailable = $this->getTotalAvailableHours();
+        $totalUsed = $this->getTotalUsedHours();
+
+        \Log::info("Streamer {$this->id} - Validation: Available: {$totalAvailable}, Used: {$totalUsed}, Remaining: {$remainingHours}, Requested: {$requestedHours}");
 
         return $requestedHours <= $remainingHours;
     }
