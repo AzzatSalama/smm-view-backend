@@ -294,16 +294,30 @@ class StreamerController extends Controller
         // Check if stream is within subscription period
         $activeSubscription = $streamer->getActiveSubscription();
         if ($activeSubscription) {
-            $subscriptionStart = Carbon::parse($activeSubscription->start_date)->startOfDay();
-            $subscriptionEnd = Carbon::parse($activeSubscription->end_date)->endOfDay();
-            $streamDate = Carbon::parse($data['scheduled_start']);
+            $subscriptionStart = Carbon::parse($activeSubscription->start_date);
+            $subscriptionEnd = Carbon::parse($activeSubscription->end_date);
+            $streamStart = Carbon::parse($data['scheduled_start']);
+            $streamEnd = $streamStart->copy()->addMinutes($data['estimated_duration']);
             
-            if ($streamDate->lt($subscriptionStart) || $streamDate->gt($subscriptionEnd)) {
+            // Check if stream starts before subscription period
+            if ($streamStart->lt($subscriptionStart)) {
                 return response()->json([
-                    'message' => 'Stream must be scheduled within your subscription period',
-                    'subscription_start' => $subscriptionStart->format('Y-m-d'),
-                    'subscription_end' => $subscriptionEnd->format('Y-m-d'),
-                    'requested_date' => $streamDate->format('Y-m-d'),
+                    'message' => 'Stream cannot start before your subscription period begins',
+                    'subscription_start' => $subscriptionStart->format('Y-m-d H:i:s'),
+                    'subscription_end' => $subscriptionEnd->format('Y-m-d H:i:s'),
+                    'requested_start' => $streamStart->format('Y-m-d H:i:s'),
+                ], 422);
+            }
+            
+            // Check if stream ends after subscription period
+            if ($streamEnd->gt($subscriptionEnd)) {
+                return response()->json([
+                    'message' => 'Stream cannot end after your subscription period expires',
+                    'subscription_start' => $subscriptionStart->format('Y-m-d H:i:s'),
+                    'subscription_end' => $subscriptionEnd->format('Y-m-d H:i:s'),
+                    'requested_start' => $streamStart->format('Y-m-d H:i:s'),
+                    'requested_end' => $streamEnd->format('Y-m-d H:i:s'),
+                    'stream_duration_minutes' => $data['estimated_duration'],
                 ], 422);
             }
         }

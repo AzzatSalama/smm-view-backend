@@ -154,18 +154,26 @@ class Streamer extends Model
         $endDate = \Carbon\Carbon::parse($activeSubscription->end_date);
 
         $streams = $this->plannedStreams()
-            ->where('scheduled_start', '>=', $startDate)
-            ->where('scheduled_start', '<=', $endDate)
             ->whereIn('status', [PlannedStream::STATUS_SCHEDULED, PlannedStream::STATUS_LIVE, PlannedStream::STATUS_COMPLETED])
             ->get();
 
-        $totalMinutes = $streams->sum(function ($stream) {
-            return $stream->estimated_duration; // Already in minutes
-        });
+        $totalMinutes = 0;
+        $validStreams = [];
 
-        \Log::info("Streamer {$this->id} - Found {$streams->count()} streams, Total minutes: {$totalMinutes}");
         foreach ($streams as $stream) {
-            \Log::info("Stream {$stream->id}: {$stream->scheduled_start}, Duration: {$stream->estimated_duration} min");
+            $streamStart = \Carbon\Carbon::parse($stream->scheduled_start);
+            $streamEnd = $streamStart->copy()->addMinutes($stream->estimated_duration);
+            
+            // Only count streams that are completely within the subscription period
+            if ($streamStart->gte($startDate) && $streamEnd->lte($endDate)) {
+                $totalMinutes += $stream->estimated_duration;
+                $validStreams[] = $stream;
+            }
+        }
+
+        \Log::info("Streamer {$this->id} - Found {$streams->count()} total streams, " . count($validStreams) . " valid streams, Total minutes: {$totalMinutes}");
+        foreach ($validStreams as $stream) {
+            \Log::info("Valid Stream {$stream->id}: {$stream->scheduled_start}, Duration: {$stream->estimated_duration} min");
         }
 
         return $totalMinutes;
