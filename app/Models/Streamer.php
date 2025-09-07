@@ -162,7 +162,7 @@ class Streamer extends Model
 
         foreach ($streams as $stream) {
             $streamStart = \Carbon\Carbon::parse($stream->scheduled_start);
-            $streamEnd = $streamStart->copy()->addMinutes($stream->estimated_duration);
+            $streamEnd = $streamStart->copy()->addMinutes((int) $stream->estimated_duration);
             
             // Only count streams that are completely within the subscription period
             if ($streamStart->gte($startDate) && $streamEnd->lte($endDate)) {

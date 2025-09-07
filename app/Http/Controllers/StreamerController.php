@@ -297,7 +297,7 @@ class StreamerController extends Controller
             $subscriptionStart = Carbon::parse($activeSubscription->start_date);
             $subscriptionEnd = Carbon::parse($activeSubscription->end_date);
             $streamStart = Carbon::parse($data['scheduled_start']);
-            $streamEnd = $streamStart->copy()->addMinutes($data['estimated_duration']);
+            $streamEnd = $streamStart->copy()->addMinutes((int) $data['estimated_duration']);
             
             // Check if stream starts before subscription period
             if ($streamStart->lt($subscriptionStart)) {
@@ -342,7 +342,7 @@ class StreamerController extends Controller
         $conflictingStream = $streamer->plannedStreams()
             ->where('status', PlannedStream::STATUS_SCHEDULED)
             ->where(function ($query) use ($scheduledStart, $data) {
-                $streamEnd = $scheduledStart->copy()->addMinutes($data['estimated_duration']);
+                $streamEnd = $scheduledStart->copy()->addMinutes((int) $data['estimated_duration']);
                 $query->whereBetween('scheduled_start', [
                     $scheduledStart->copy()->subMinutes(30),
                     $streamEnd->copy()->addMinutes(30)
@@ -451,7 +451,7 @@ class StreamerController extends Controller
                 ->where('id', '!=', $stream->id)
                 ->where('status', PlannedStream::STATUS_SCHEDULED)
                 ->where(function ($query) use ($newScheduledStart, $newDuration) {
-                    $streamEnd = $newScheduledStart->copy()->addMinutes($newDuration);
+                    $streamEnd = $newScheduledStart->copy()->addMinutes((int) $newDuration);
                     $query->whereBetween('scheduled_start', [
                         $newScheduledStart->copy()->subMinutes(30),
                         $streamEnd->copy()->addMinutes(30)
