@@ -143,13 +143,21 @@ class Streamer extends Model
         $endDate = \Carbon\Carbon::parse($activeSubscription->end_date);
 
         $streams = $this->plannedStreams()
-            ->whereBetween('scheduled_start', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->where('scheduled_start', '>=', $startDate)
+            ->where('scheduled_start', '<=', $endDate)
             ->whereIn('status', [PlannedStream::STATUS_SCHEDULED, PlannedStream::STATUS_LIVE, PlannedStream::STATUS_COMPLETED])
             ->get();
 
-        return $streams->sum(function ($stream) {
+        $totalHours = $streams->sum(function ($stream) {
             return $stream->getDurationInHours();
         });
+
+        \Log::info("Streamer {$this->id} - Found {$streams->count()} streams, Total hours: {$totalHours}");
+        foreach ($streams as $stream) {
+            \Log::info("Stream {$stream->id}: {$stream->scheduled_start}, Duration: {$stream->estimated_duration} min, Hours: " . $stream->getDurationInHours());
+        }
+
+        return $totalHours;
     }
 
     /**
