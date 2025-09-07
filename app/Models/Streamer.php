@@ -121,13 +121,9 @@ class Streamer extends Model
             return 0;
         }
 
-        $startDate = \Carbon\Carbon::parse($activeSubscription->start_date);
-        $endDate = \Carbon\Carbon::parse($activeSubscription->end_date);
-        
-        // For same-day subscriptions, we still want 1 day
-        $totalDays = $startDate->isSameDay($endDate) ? 1 : $startDate->diffInDays($endDate) + 1;
+        // Use the subscription plan's duration_days and duration_hours directly
+        $totalDays = $activeSubscription->subscriptionPlan->duration_days;
         $dailyHours = $activeSubscription->subscriptionPlan->duration_hours;
-
 
         return $totalDays * $dailyHours;
     }
