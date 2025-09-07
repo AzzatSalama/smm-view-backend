@@ -302,22 +302,14 @@ class StreamerController extends Controller
             // Check if stream starts before subscription period
             if ($streamStart->lt($subscriptionStart)) {
                 return response()->json([
-                    'message' => 'Stream cannot start before your subscription period begins',
-                    'subscription_start' => $subscriptionStart->format('Y-m-d H:i:s'),
-                    'subscription_end' => $subscriptionEnd->format('Y-m-d H:i:s'),
-                    'requested_start' => $streamStart->format('Y-m-d H:i:s'),
+                    'message' => 'Stream cannot start before your subscription period begins. Your subscription period starts at: ' . $subscriptionStart->format('Y-m-d H:i:s') . ' and ends at: ' . $subscriptionEnd->format('Y-m-d H:i:s') . '. Requested start: ' . $streamStart->format('Y-m-d H:i:s'),
                 ], 422);
             }
-            
-            // Check if stream ends after subscription period
-            if ($streamEnd->gt($subscriptionEnd)) {
+
+            // Check if stream starts after subscription period
+            if ($streamStart->gt($subscriptionEnd)) {
                 return response()->json([
-                    'message' => 'Stream cannot end after your subscription period expires',
-                    'subscription_start' => $subscriptionStart->format('Y-m-d H:i:s'),
-                    'subscription_end' => $subscriptionEnd->format('Y-m-d H:i:s'),
-                    'requested_start' => $streamStart->format('Y-m-d H:i:s'),
-                    'requested_end' => $streamEnd->format('Y-m-d H:i:s'),
-                    'stream_duration_minutes' => $data['estimated_duration'],
+                    'message' => 'Stream cannot start after your subscription period ends. Your subscription period starts at: ' . $subscriptionStart->format('Y-m-d H:i:s') . ' and ends at: ' . $subscriptionEnd->format('Y-m-d H:i:s') . '. Requested start: ' . $streamStart->format('Y-m-d H:i:s'),
                 ], 422);
             }
         }
