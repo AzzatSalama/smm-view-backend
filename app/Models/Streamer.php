@@ -162,19 +162,18 @@ class Streamer extends Model
 
         foreach ($streams as $stream) {
             $streamStart = \Carbon\Carbon::parse($stream->scheduled_start);
-            $streamEnd = $streamStart->copy()->addMinutes((int) $stream->estimated_duration);
             
-            // Only count streams that are completely within the subscription period
-            if ($streamStart->gte($startDate) && $streamEnd->lte($endDate)) {
+            // Only count streams that start at or after the subscription start date and start before or at the subscription end date
+            if ($streamStart->gte($startDate) && $streamStart->lte($endDate)) {
                 $totalMinutes += $stream->estimated_duration;
                 $validStreams[] = $stream;
             }
         }
 
-        \Log::info("Streamer {$this->id} - Found {$streams->count()} total streams, " . count($validStreams) . " valid streams, Total minutes: {$totalMinutes}");
-        foreach ($validStreams as $stream) {
-            \Log::info("Valid Stream {$stream->id}: {$stream->scheduled_start}, Duration: {$stream->estimated_duration} min");
-        }
+        // \Log::info("Streamer {$this->id} - Found {$streams->count()} total streams, " . count($validStreams) . " valid streams, Total minutes: {$totalMinutes}");
+        // foreach ($validStreams as $stream) {
+        //     \Log::info("Valid Stream {$stream->id}: {$stream->scheduled_start}, Duration: {$stream->estimated_duration} min");
+        // }
 
         return $totalMinutes;
     }
