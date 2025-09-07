@@ -110,6 +110,110 @@ class Streamer extends Model
         return max(0, $dailyLimit - $currentDuration);
     }
 
+    /**
+     * Get total available hours for the entire subscription period
+     */
+    public function getTotalAvailableHours(): float
+    {
+        $activeSubscription = $this->getActiveSubscription();
+
+        if (!$activeSubscription || !$activeSubscription->subscriptionPlan) {
+            return 0;
+        }
+
+        $startDate = \Carbon\Carbon::parse($activeSubscription->start_date);
+        $endDate = \Carbon\Carbon::parse($activeSubscription->end_date);
+        
+        // For same-day subscriptions, we still want 1 day
+        $totalDays = $startDate->isSameDay($endDate) ? 1 : $startDate->diffInDays($endDate) + 1;
+        $dailyHours = $activeSubscription->subscriptionPlan->duration_hours;
+
+
+        return $totalDays * $dailyHours;
+    }
+
+    /**
+     * Get total hours used across the entire subscription period
+     */
+    public function getTotalUsedHours(): float
+    {
+        $activeSubscription = $this->getActiveSubscription();
+
+        if (!$activeSubscription) {
+            return 0;
+        }
+
+        $startDate = \Carbon\Carbon::parse($activeSubscription->start_date);
+        $endDate = \Carbon\Carbon::parse($activeSubscription->end_date);
+
+        $streams = $this->plannedStreams()
+            ->whereBetween('scheduled_start', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->whereIn('status', [PlannedStream::STATUS_SCHEDULED, PlannedStream::STATUS_LIVE, PlannedStream::STATUS_COMPLETED])
+            ->get();
+
+        return $streams->sum(function ($stream) {
+            return $stream->getDurationInHours();
+        });
+    }
+
+    /**
+     * Get remaining hours for the entire subscription period
+     */
+    public function getRemainingTotalHours(): float
+    {
+        $totalAvailable = $this->getTotalAvailableHours();
+        $totalUsed = $this->getTotalUsedHours();
+
+        return max(0, $totalAvailable - $totalUsed);
+    }
+
+    /**
+     * Check if streamer can add a stream with given duration (using total hours system)
+     */
+    public function canAddStreamWithTotalHours(int $durationMinutes): bool
+    {
+        $remainingHours = $this->getRemainingTotalHours();
+        $requestedHours = $durationMinutes / 60;
+
+        return $requestedHours <= $remainingHours;
+    }
+
+    /**
+     * Check if subscription has expired and has unused hours
+     */
+    public function hasExpiredWithUnusedHours(): bool
+    {
+        $activeSubscription = $this->getActiveSubscription();
+
+        if (!$activeSubscription) {
+            return false;
+        }
+
+        $endDate = \Carbon\Carbon::parse($activeSubscription->end_date);
+        $now = \Carbon\Carbon::now();
+
+        // Check if subscription has expired
+        if ($endDate->isFuture()) {
+            return false;
+        }
+
+        // Check if there are unused hours
+        $remainingHours = $this->getRemainingTotalHours();
+        return $remainingHours > 0;
+    }
+
+    /**
+     * Get unused hours when subscription expires
+     */
+    public function getUnusedHoursOnExpiration(): float
+    {
+        if (!$this->hasExpiredWithUnusedHours()) {
+            return 0;
+        }
+
+        return $this->getRemainingTotalHours();
+    }
+
     public function isCurrentlyStreaming(): bool
     {
         return $this->current_stream_id !== null &&

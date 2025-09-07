@@ -247,8 +247,13 @@ class StreamerController extends Controller
 
         return response()->json([
             'streams' => $streams,
-            'daily_limit_hours' => $streamer->getDailyStreamingLimit(),
+            'daily_limit_hours' => $streamer->getDailyStreamingLimit(), // Keep for backward compatibility
+            'total_available_hours' => $streamer->getTotalAvailableHours(),
+            'total_used_hours' => $streamer->getTotalUsedHours(),
+            'remaining_total_hours' => $streamer->getRemainingTotalHours(),
             'has_active_subscription' => $streamer->hasActiveSubscription(),
+            'has_expired_with_unused_hours' => $streamer->hasExpiredWithUnusedHours(),
+            'unused_hours_on_expiration' => $streamer->getUnusedHoursOnExpiration(),
         ]);
     }
 
@@ -283,15 +288,34 @@ class StreamerController extends Controller
         // Extract date from scheduled_start for daily limit check
         $scheduledDate = Carbon::parse($data['scheduled_start'])->format('Y-m-d');
 
-        // Check if adding this stream would exceed daily limit
-        if (!$streamer->canAddStreamForDate($scheduledDate, $data['estimated_duration'])) {
-            $remainingTime = $streamer->getRemainingStreamTimeForDate($scheduledDate);
-            $dailyLimit = $streamer->getDailyStreamingLimit();
+        // Check if stream is within subscription period
+        $activeSubscription = $streamer->getActiveSubscription();
+        if ($activeSubscription) {
+            $subscriptionStart = Carbon::parse($activeSubscription->start_date)->startOfDay();
+            $subscriptionEnd = Carbon::parse($activeSubscription->end_date)->endOfDay();
+            $streamDate = Carbon::parse($data['scheduled_start']);
+            
+            if ($streamDate->lt($subscriptionStart) || $streamDate->gt($subscriptionEnd)) {
+                return response()->json([
+                    'message' => 'Stream must be scheduled within your subscription period',
+                    'subscription_start' => $subscriptionStart->format('Y-m-d'),
+                    'subscription_end' => $subscriptionEnd->format('Y-m-d'),
+                    'requested_date' => $streamDate->format('Y-m-d'),
+                ], 422);
+            }
+        }
+
+        // Check if adding this stream would exceed total available hours
+        if (!$streamer->canAddStreamWithTotalHours($data['estimated_duration'])) {
+            $remainingHours = $streamer->getRemainingTotalHours();
+            $totalAvailable = $streamer->getTotalAvailableHours();
+            $totalUsed = $streamer->getTotalUsedHours();
 
             return response()->json([
-                'message' => 'Adding this stream would exceed your daily streaming limit',
-                'daily_limit_hours' => $dailyLimit,
-                'remaining_hours' => round($remainingTime, 2),
+                'message' => 'Adding this stream would exceed your total available streaming hours',
+                'total_available_hours' => round($totalAvailable, 2),
+                'total_used_hours' => round($totalUsed, 2),
+                'remaining_hours' => round($remainingHours, 2),
                 'requested_hours' => round($data['estimated_duration'] / 60, 2),
             ], 422);
         }
@@ -384,24 +408,16 @@ class StreamerController extends Controller
 
             $scheduledDate = $newScheduledStart->format('Y-m-d');
 
-            // Calculate current duration for the date excluding this stream
-            $currentDurationExcludingThis = $streamer->plannedStreams()
-                ->forDate($scheduledDate)
-                ->where('id', '!=', $stream->id)
-                ->whereIn('status', [PlannedStream::STATUS_SCHEDULED, PlannedStream::STATUS_LIVE, PlannedStream::STATUS_COMPLETED])
-                ->get()
-                ->sum(function ($s) {
-                    return $s->getDurationInHours();
-                });
-
-            $dailyLimit = $streamer->getDailyStreamingLimit();
+            // Calculate total used hours excluding this stream
+            $totalUsedExcludingThis = $streamer->getTotalUsedHours() - $stream->getDurationInHours();
             $newStreamDuration = $newDuration / 60;
+            $totalAvailable = $streamer->getTotalAvailableHours();
 
-            if (($currentDurationExcludingThis + $newStreamDuration) > $dailyLimit) {
+            if (($totalUsedExcludingThis + $newStreamDuration) > $totalAvailable) {
                 return response()->json([
-                    'message' => 'Updating this stream would exceed your daily streaming limit',
-                    'daily_limit_hours' => $dailyLimit,
-                    'current_usage_hours' => round($currentDurationExcludingThis, 2),
+                    'message' => 'Updating this stream would exceed your total available streaming hours',
+                    'total_available_hours' => round($totalAvailable, 2),
+                    'current_usage_hours' => round($totalUsedExcludingThis, 2),
                     'requested_hours' => round($newStreamDuration, 2),
                 ], 422);
             }
