@@ -251,6 +251,9 @@ class StreamerController extends Controller
             'total_available_hours' => $streamer->getTotalAvailableHours(),
             'total_used_hours' => $streamer->getTotalUsedHours(),
             'remaining_total_hours' => $streamer->getRemainingTotalHours(),
+            'total_available_minutes' => $streamer->getTotalAvailableMinutes(),
+            'total_used_minutes' => $streamer->getTotalUsedMinutes(),
+            'remaining_total_minutes' => $streamer->getRemainingTotalMinutes(),
             'has_active_subscription' => $streamer->hasActiveSubscription(),
             'has_expired_with_unused_hours' => $streamer->hasExpiredWithUnusedHours(),
             'unused_hours_on_expiration' => $streamer->getUnusedHoursOnExpiration(),
@@ -305,18 +308,18 @@ class StreamerController extends Controller
             }
         }
 
-        // Check if adding this stream would exceed total available hours
-        if (!$streamer->canAddStreamWithTotalHours($data['estimated_duration'])) {
-            $remainingHours = $streamer->getRemainingTotalHours();
-            $totalAvailable = $streamer->getTotalAvailableHours();
-            $totalUsed = $streamer->getTotalUsedHours();
+        // Check if adding this stream would exceed total available minutes
+        if (!$streamer->canAddStreamWithTotalMinutes($data['estimated_duration'])) {
+            $remainingMinutes = $streamer->getRemainingTotalMinutes();
+            $totalAvailable = $streamer->getTotalAvailableMinutes();
+            $totalUsed = $streamer->getTotalUsedMinutes();
 
             return response()->json([
-                'message' => 'Adding this stream would exceed your total available streaming hours',
-                'total_available_hours' => round($totalAvailable, 2),
-                'total_used_hours' => round($totalUsed, 2),
-                'remaining_hours' => round($remainingHours, 2),
-                'requested_hours' => round($data['estimated_duration'] / 60, 2),
+                'message' => 'Adding this stream would exceed your total available streaming time',
+                'total_available_minutes' => $totalAvailable,
+                'total_used_minutes' => $totalUsed,
+                'remaining_minutes' => $remainingMinutes,
+                'requested_minutes' => $data['estimated_duration'],
             ], 422);
         }
 

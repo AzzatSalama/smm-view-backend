@@ -111,9 +111,9 @@ class Streamer extends Model
     }
 
     /**
-     * Get total available hours for the entire subscription period
+     * Get total available minutes for the entire subscription period
      */
-    public function getTotalAvailableHours(): float
+    public function getTotalAvailableMinutes(): int
     {
         $activeSubscription = $this->getActiveSubscription();
 
@@ -124,17 +124,25 @@ class Streamer extends Model
         // Use the subscription plan's duration_days and duration_hours directly
         $totalDays = $activeSubscription->subscriptionPlan->duration_days;
         $dailyHours = $activeSubscription->subscriptionPlan->duration_hours;
-        $totalAvailable = $totalDays * $dailyHours;
+        $totalAvailableMinutes = $totalDays * $dailyHours * 60; // Convert hours to minutes
 
-        \Log::info("Streamer {$this->id} - Available Hours: {$totalDays} days × {$dailyHours} hours = {$totalAvailable} hours");
+        \Log::info("Streamer {$this->id} - Available Minutes: {$totalDays} days × {$dailyHours} hours × 60 = {$totalAvailableMinutes} minutes");
 
-        return $totalAvailable;
+        return $totalAvailableMinutes;
     }
 
     /**
-     * Get total hours used across the entire subscription period
+     * Get total available hours for the entire subscription period (for backward compatibility)
      */
-    public function getTotalUsedHours(): float
+    public function getTotalAvailableHours(): float
+    {
+        return $this->getTotalAvailableMinutes() / 60;
+    }
+
+    /**
+     * Get total minutes used across the entire subscription period
+     */
+    public function getTotalUsedMinutes(): int
     {
         $activeSubscription = $this->getActiveSubscription();
 
@@ -148,44 +156,68 @@ class Streamer extends Model
         $streams = $this->plannedStreams()
             ->where('scheduled_start', '>=', $startDate)
             ->where('scheduled_start', '<=', $endDate)
+            ->whereIn('status', [PlannedStream::STATUS_SCHEDULED, PlannedStream::STATUS_LIVE, PlannedStream::STATUS_COMPLETED])
             ->get();
 
-        $totalHours = $streams->sum(function ($stream) {
-            return $stream->getDurationInHours();
+        $totalMinutes = $streams->sum(function ($stream) {
+            return $stream->estimated_duration; // Already in minutes
         });
 
-        \Log::info("Streamer {$this->id} - Found {$streams->count()} streams, Total hours: {$totalHours}");
+        \Log::info("Streamer {$this->id} - Found {$streams->count()} streams, Total minutes: {$totalMinutes}");
         foreach ($streams as $stream) {
-            \Log::info("Stream {$stream->id}: {$stream->scheduled_start}, Duration: {$stream->estimated_duration} min, Hours: " . $stream->getDurationInHours());
+            \Log::info("Stream {$stream->id}: {$stream->scheduled_start}, Duration: {$stream->estimated_duration} min");
         }
 
-        return $totalHours;
+        return $totalMinutes;
     }
 
     /**
-     * Get remaining hours for the entire subscription period
+     * Get total hours used across the entire subscription period (for backward compatibility)
      */
-    public function getRemainingTotalHours(): float
+    public function getTotalUsedHours(): float
     {
-        $totalAvailable = $this->getTotalAvailableHours();
-        $totalUsed = $this->getTotalUsedHours();
+        return $this->getTotalUsedMinutes() / 60;
+    }
+
+    /**
+     * Get remaining minutes for the entire subscription period
+     */
+    public function getRemainingTotalMinutes(): int
+    {
+        $totalAvailable = $this->getTotalAvailableMinutes();
+        $totalUsed = $this->getTotalUsedMinutes();
 
         return max(0, $totalAvailable - $totalUsed);
     }
 
     /**
-     * Check if streamer can add a stream with given duration (using total hours system)
+     * Get remaining hours for the entire subscription period (for backward compatibility)
+     */
+    public function getRemainingTotalHours(): float
+    {
+        return $this->getRemainingTotalMinutes() / 60;
+    }
+
+    /**
+     * Check if streamer can add a stream with given duration (using total minutes system)
+     */
+    public function canAddStreamWithTotalMinutes(int $durationMinutes): bool
+    {
+        $remainingMinutes = $this->getRemainingTotalMinutes();
+        $totalAvailable = $this->getTotalAvailableMinutes();
+        $totalUsed = $this->getTotalUsedMinutes();
+
+        \Log::info("Streamer {$this->id} - Validation: Available: {$totalAvailable} min, Used: {$totalUsed} min, Remaining: {$remainingMinutes} min, Requested: {$durationMinutes} min");
+
+        return $durationMinutes <= $remainingMinutes;
+    }
+
+    /**
+     * Check if streamer can add a stream with given duration (using total hours system - for backward compatibility)
      */
     public function canAddStreamWithTotalHours(int $durationMinutes): bool
     {
-        $remainingHours = $this->getRemainingTotalHours();
-        $requestedHours = $durationMinutes / 60;
-        $totalAvailable = $this->getTotalAvailableHours();
-        $totalUsed = $this->getTotalUsedHours();
-
-        \Log::info("Streamer {$this->id} - Validation: Available: {$totalAvailable}, Used: {$totalUsed}, Remaining: {$remainingHours}, Requested: {$requestedHours}");
-
-        return $requestedHours <= $remainingHours;
+        return $this->canAddStreamWithTotalMinutes($durationMinutes);
     }
 
     /**
