@@ -244,7 +244,7 @@ class AuthController extends Controller
             'email' => ['required', 'email', 'unique:users,email'],
             'username' => ['required', 'string', 'max:255', 'unique:streamers,username'],
             'full_name' => ['required', 'string', 'max:255'],
-            'discord_id' => ['nullable', 'string', 'max:255'],
+            'discord_id' => ['required', 'string', 'max:255'],
             'plan_id' => ['nullable', 'integer', 'exists:subscription_plans,id'],
             'custom_plan' => ['nullable', 'array'],
             'custom_plan.views_delivered' => ['required_if:custom_plan,!=,null', 'integer', 'min:1'],
@@ -265,7 +265,7 @@ class AuthController extends Controller
             'user_id' => $user->id,
             'username' => $data['username'],
             'full_name' => $data['full_name'],
-            'discord_id' => $data['discord_id'] ?? null,
+            'discord_id' => $data['discord_id'],
         ]);
 
         // Handle plan selection

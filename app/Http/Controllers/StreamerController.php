@@ -396,6 +396,16 @@ class StreamerController extends Controller
             ], 422);
         }
 
+        // Can't update streams that are scheduled in the past
+        // This prevents users from modifying streams that have already passed their scheduled time
+        if (Carbon::parse($stream->scheduled_start)->isPast()) {
+            return response()->json([
+                'message' => 'Cannot update a stream that is scheduled in the past',
+                'stream_scheduled_time' => $stream->scheduled_start,
+                'current_time' => now()->toISOString()
+            ], 422);
+        }
+
         $data = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string', 'max:1000'],
@@ -492,6 +502,16 @@ class StreamerController extends Controller
         if ($stream->status === PlannedStream::STATUS_LIVE) {
             return response()->json([
                 'message' => 'Cannot delete a live stream'
+            ], 422);
+        }
+
+        // Can't delete streams that are scheduled in the past
+        // This prevents users from deleting streams that have already passed their scheduled time
+        if (Carbon::parse($stream->scheduled_start)->isPast()) {
+            return response()->json([
+                'message' => 'Cannot delete a stream that is scheduled in the past',
+                'stream_scheduled_time' => $stream->scheduled_start,
+                'current_time' => now()->toISOString()
             ], 422);
         }
 
