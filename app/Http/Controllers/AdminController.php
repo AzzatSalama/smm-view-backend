@@ -638,34 +638,36 @@ class AdminController extends Controller
      */
     public function getStreamerPlanPrice($streamerId)
     {
-        $streamer = Streamer::with(['activeSubscription.subscriptionPlan'])->where('discord_id', $streamerId)->first();
+        $streamer = Streamer::with(['subscriptions.subscriptionPlan'])->where('discord_id', $streamerId)->first();
         
         if (!$streamer) {
             return response()->json(['message' => 'Streamer not found'], 404);
         }
 
-        if (!$streamer->activeSubscription || !$streamer->activeSubscription->subscriptionPlan) {
+        $latestSubscription = $streamer->subscriptions()->with('subscriptionPlan')->latest('created_at')->first();
+
+        if (!$latestSubscription || !$latestSubscription->subscriptionPlan) {
             return response()->json([
                 'streamer_id' => $streamerId,
                 'streamer_name' => $streamer->full_name ?? $streamer->username,
-                'has_active_plan' => false,
+                'has_subscription' => false,
                 'plan_price' => null,
-                'message' => 'Streamer has no active subscription plan'
+                'message' => 'Streamer has no subscription plan'
             ]);
         }
 
-        $plan = $streamer->activeSubscription->subscriptionPlan;
+        $plan = $latestSubscription->subscriptionPlan;
         
         return response()->json([
             'streamer_id' => $streamerId,
             'streamer_name' => $streamer->full_name ?? $streamer->username,
-            'has_active_plan' => true,
+            'has_subscription' => true,
             'plan_id' => $plan->id,
             'plan_name' => $plan->name,
             'plan_price' => $plan->price,
-            'subscription_status' => $streamer->activeSubscription->status,
-            'subscription_start_date' => $streamer->activeSubscription->start_date,
-            'subscription_end_date' => $streamer->activeSubscription->end_date,
+            'subscription_status' => $latestSubscription->status,
+            'subscription_start_date' => $latestSubscription->start_date,
+            'subscription_end_date' => $latestSubscription->end_date,
             'message' => 'Plan price retrieved successfully'
         ]);
     }
