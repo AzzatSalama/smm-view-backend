@@ -17,6 +17,7 @@ Route::prefix('streamer')->group(function () {
     Route::middleware(['auth:sanctum', 'streamer.token'])->group(function () {
         Route::get('check-auth', [StreamerController::class, 'checkAuth']);
         Route::get('profile', [StreamerController::class, 'profile']);
+        Route::put('profile', [StreamerController::class, 'updateProfile']);
         Route::post('logout', [StreamerController::class, 'logout']);
         Route::post('change-password', [StreamerController::class, 'changePassword']);
 

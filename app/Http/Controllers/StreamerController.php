@@ -734,4 +734,33 @@ class StreamerController extends Controller
             \Log::error('Discord notification failed: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Update streamer profile
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || !$user->isStreamer()) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $streamer = $user->streamer;
+        if (!$streamer) {
+            return response()->json(['message' => 'Streamer profile not found'], 404);
+        }
+
+        $data = $request->validate([
+            'username' => ['sometimes', 'string', 'max:255', 'unique:streamers,username,' . $streamer->id],
+            'full_name' => ['sometimes', 'string', 'max:255'],
+            'discord_id' => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+
+        $streamer->update($data);
+
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'streamer' => $streamer->fresh()
+        ]);
+    }
 }

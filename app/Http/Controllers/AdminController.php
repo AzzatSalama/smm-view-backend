@@ -632,4 +632,41 @@ class AdminController extends Controller
             'message' => 'Dashboard statistics retrieved successfully'
         ]);
     }
+
+    /**
+     * Get streamer plan total price
+     */
+    public function getStreamerPlanPrice($streamerId)
+    {
+        $streamer = Streamer::with(['activeSubscription.subscriptionPlan'])->where('discord_id', $streamerId)->first();
+        
+        if (!$streamer) {
+            return response()->json(['message' => 'Streamer not found'], 404);
+        }
+
+        if (!$streamer->activeSubscription || !$streamer->activeSubscription->subscriptionPlan) {
+            return response()->json([
+                'streamer_id' => $streamerId,
+                'streamer_name' => $streamer->full_name ?? $streamer->username,
+                'has_active_plan' => false,
+                'plan_price' => null,
+                'message' => 'Streamer has no active subscription plan'
+            ]);
+        }
+
+        $plan = $streamer->activeSubscription->subscriptionPlan;
+        
+        return response()->json([
+            'streamer_id' => $streamerId,
+            'streamer_name' => $streamer->full_name ?? $streamer->username,
+            'has_active_plan' => true,
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+            'plan_price' => $plan->price,
+            'subscription_status' => $streamer->activeSubscription->status,
+            'subscription_start_date' => $streamer->activeSubscription->start_date,
+            'subscription_end_date' => $streamer->activeSubscription->end_date,
+            'message' => 'Plan price retrieved successfully'
+        ]);
+    }
 }

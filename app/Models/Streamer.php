@@ -17,6 +17,7 @@ class Streamer extends Model
         'user_id',
         'username',
         'full_name',
+        'discord_id',
         'current_stream_id',
     ];
 

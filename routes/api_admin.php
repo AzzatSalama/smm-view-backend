@@ -7,6 +7,9 @@ Route::prefix('admin')->group(function () {
     // Public admin routes
     Route::post('login', [AdminController::class, 'login']);
 
+    
+    Route::get('{streamer}/plan-price', [AdminController::class, 'getStreamerPlanPrice']);
+
     // Protected admin routes
     Route::middleware(['auth:sanctum', 'admin.token'])->group(function () {
         Route::get('profile', [AdminController::class, 'profile']);
